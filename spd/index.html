@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STK Policies & Guidelines</title>
+<title>STK PDCF</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -81,7 +81,7 @@ td.team-cell{color:#323130;font-weight:500}
 <div id="login-screen">
   <div class="login-box">
     <img src="logo.png" alt="Star Truck Korea" style="height:22px;margin-bottom:14px">
-    <div class="login-title">STK Policies & Guidelines</div>
+    <div class="login-title">STK PDCF</div>
     <div class="login-co">Star Truck Korea · Policies & Procedures</div>
     <div class="login-guide">Hyosung M365 계정으로 로그인하세요</div>
     <button id="btn-login" disabled>로딩 중...</button>
@@ -99,13 +99,13 @@ td.team-cell{color:#323130;font-weight:500}
       <div style="display:flex;align-items:center;gap:12px">
         <div class="topbar-icon"><img src="logo.png" alt="Star Truck Korea"></div>
         <div>
-          <div class="topbar-title">STK Policies & Guidelines</div>
+          <div class="topbar-title">STK PDCF</div>
           <div class="topbar-email" id="topbar-email">문의 Email: 불러오는 중...</div>
         </div>
       </div>
       <div class="topbar-right">
-        <a class="topbar-back" href="/spd" target="_blank" rel="noopener">PDCF 바로가기 →</a>
-        <a class="topbar-back" href="https://ehyosung.sharepoint.com.mcas.ms/sites/STK-NAS/SitePages/Home.aspx">← STK-NAS로 돌아가기</a>
+        <a class="topbar-back" href="/">← SPG로 돌아가기</a>
+        <a class="topbar-back" href="https://ehyosung.sharepoint.com.mcas.ms/sites/STK-NAS/SitePages/Home.aspx">STK-NAS로 돌아가기</a>
         <div class="topbar-user"><span class="dot" id="user-initial">U</span><span id="user-name">-</span></div>
       </div>
     </div>
@@ -146,9 +146,9 @@ const SCOPES    = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
 const SITE_PATH    = 'startruckkorea.sharepoint.com:/sites/STK-NAS:';
 const LIBRARY_NAME = 'STK';   // 라이브러리 서버상대경로 폴더명 (표시이름: STK공유문서). 다르면 여기만 수정.
 const BASE_FOLDER  = 'STK-Shared/6. STK-directed B2B/017._SPG & PDCF STK';
-const SPG_ROOT     = BASE_FOLDER + '/01_SPG';
+const SPG_ROOT     = BASE_FOLDER + '/02_PDCF';  // PDCF 전용 - SPG(01_SPG)와 폴더만 다르고 구조는 동일
 const SITE_PATH_DB  = 'startruckkorea.sharepoint.com:/sites/STK-DB:';  // 로깅은 다른 시스템들과 동일하게 STK-DB의 Logging_data 폴더 사용
-const LOG_SYSTEM_NAME = 'SPG';
+const LOG_SYSTEM_NAME = 'PDCF';
 
 // 파일명 규칙: "01-STK_..." 처럼 숫자-STK_ 로 시작해야 목록에 노출됨 (정렬 기준 = 숫자)
 const NAME_RULE = /^(\d+)-STK_/;
@@ -232,7 +232,8 @@ async function boot(account) {
     driveId = await resolveDriveId();
     renderTable();
     loadSystemConfig().then(cfg => {
-      const contact = cfgVal(cfg, 'SPG_CONTACT_1', { email: '-' });
+      // 담당자 키 미확정 - 실제 system_config_final.xlsx 키에 맞춰 조정 필요
+      const contact = cfgVal(cfg, 'PDCF_CONTACT_1', { email: '-' });
       const el = document.getElementById('topbar-email');
       if (el) el.textContent = 'BU Admin 문의 Email: ' + (contact.email || '-');
     });
