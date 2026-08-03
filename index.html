@@ -42,12 +42,13 @@ tbody tr.dept-first td.dept-cell{border-top:2px solid #d6d4d2}
 td.dept-cell{background:#f1eafb;font-weight:700;color:#2E008B}
 td.team-cell{color:#323130;font-weight:500}
 
-.dd{position:relative}
+.dd{position:relative;z-index:41}
 .dd-btn{width:100%;max-width:260px;display:flex;justify-content:space-between;align-items:center;gap:8px;
   border:1px solid #d2d0ce;background:#fff;border-radius:4px;padding:6px 10px;font-size:.78rem;cursor:pointer;color:#323130}
 .dd-btn:hover{border-color:#2E008B}
 .dd-btn .arrow{color:#605e5c;font-size:.7rem}
-.dd-panel{position:absolute;top:calc(100% + 4px);left:0;min-width:280px;max-width:400px;background:#fff;
+#dd-backdrop{position:fixed;inset:0;z-index:40;display:none}
+.dd-panel{position:absolute;top:calc(100% + 4px);left:0;width:260px;background:#fff;
   border:1px solid #d2d0ce;border-radius:5px;box-shadow:0 4px 14px rgba(0,0,0,.15);z-index:50;display:none;max-height:260px;overflow-y:auto}
 .dd-panel.open{display:block}
 .dd-item{padding:8px 12px;font-size:.78rem;cursor:pointer;border-bottom:1px solid #f3f2f1;display:flex;align-items:center;gap:8px;color:#252423}
@@ -107,6 +108,7 @@ td.team-cell{color:#323130;font-weight:500}
   </div>
 </div>
 
+<div id="dd-backdrop" onclick="closeAllDropdowns()"></div>
 <div id="toast"></div>
 
 <script>
@@ -271,12 +273,9 @@ let openPanelId = null;
 
 function closeAllDropdowns() {
   document.querySelectorAll('.dd-panel.open').forEach(p => p.classList.remove('open'));
+  document.getElementById('dd-backdrop').style.display = 'none';
   openPanelId = null;
 }
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.dd')) closeAllDropdowns();
-});
 
 async function toggleDropdown(key, dept, team, sub) {
   const panel = document.getElementById('panel-' + key);
@@ -284,6 +283,7 @@ async function toggleDropdown(key, dept, team, sub) {
   closeAllDropdowns();
   if (isOpen) return; // 이미 열려있던 걸 다시 누른 거면 닫기만 하고 종료
   panel.classList.add('open');
+  document.getElementById('dd-backdrop').style.display = 'block';
   openPanelId = key;
   panel.innerHTML = `<div class="dd-loading">불러오는 중...</div>`;
 
