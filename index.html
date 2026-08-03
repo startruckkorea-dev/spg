@@ -64,6 +64,7 @@ td.team-cell{color:#323130;font-weight:500}
 .dd-panel{position:absolute;top:calc(100% + 4px);left:0;width:max(100%, 460px);max-width:90vw;background:#fff;
   border:1px solid #d9d7d5;border-radius:7px;box-shadow:0 8px 20px rgba(0,0,0,.14);z-index:50;display:none;max-height:240px;overflow-y:auto}
 .dd-panel.open{display:block}
+.dd-panel.drop-up{top:auto;bottom:calc(100% + 4px)}
 .dd-item{padding:7px 11px;font-size:.66rem;cursor:pointer;border-bottom:1px solid #F0F1F3;display:flex;align-items:center;gap:8px;color:#252423}
 .dd-item:last-child{border-bottom:none}
 .dd-item:hover{background:#EFF6F5}
@@ -104,7 +105,6 @@ td.team-cell{color:#323130;font-weight:500}
         </div>
       </div>
       <div class="topbar-right">
-        <a class="topbar-back" href="/spd" target="_blank" rel="noopener">PDCF 바로가기 →</a>
         <a class="topbar-back" href="https://ehyosung.sharepoint.com.mcas.ms/sites/STK-NAS/SitePages/Home.aspx">← STK-NAS로 돌아가기</a>
         <div class="topbar-user"><span class="dot" id="user-initial">U</span><span id="user-name">-</span></div>
       </div>
@@ -293,7 +293,7 @@ function esc(s) { return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 let openPanelId = null;
 
 function closeAllDropdowns() {
-  document.querySelectorAll('.dd-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.dd-panel.open').forEach(p => { p.classList.remove('open'); p.classList.remove('drop-up'); });
   document.querySelectorAll('.dd.dd-open').forEach(d => d.classList.remove('dd-open'));
   document.getElementById('dd-backdrop').style.display = 'none';
   openPanelId = null;
@@ -301,10 +301,18 @@ function closeAllDropdowns() {
 
 async function toggleDropdown(key, dept, team, sub) {
   const panel = document.getElementById('panel-' + key);
+  const btn = document.querySelector(`#dd-${key} .dd-btn`);
   const isOpen = panel.classList.contains('open');
   closeAllDropdowns();
   if (isOpen) return; // 이미 열려있던 걸 다시 누른 거면 닫기만 하고 종료
   panel.classList.add('open');
+
+  // 버튼 아래 남은 공간이 패널 예상 높이보다 부족하면 위쪽으로 펼침
+  const btnRect = btn.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - btnRect.bottom;
+  const estimatedPanelHeight = 240; // max-height와 동일
+  panel.classList.toggle('drop-up', spaceBelow < estimatedPanelHeight + 20);
+
   document.getElementById('dd-' + key).classList.add('dd-open');
   document.getElementById('dd-backdrop').style.display = 'block';
   openPanelId = key;
