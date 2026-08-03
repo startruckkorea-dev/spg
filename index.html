@@ -24,7 +24,7 @@ body{font-family:'Segoe UI',sans-serif;background:#F5F6F8;min-height:100vh;color
 .topbar-outer{background:#F5F6F8;padding-top:20px}
 .topbar{background:#101B34;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(16,27,52,.18);max-width:1200px;margin:0 auto;border-radius:10px}
 .topbar-title{color:#fff;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
-.topbar-title .badge-mark{width:8px;height:8px;border-radius:2px;background:#2F7B7A}
+.topbar-icon{width:30px;height:30px;border-radius:8px;background:rgba(47,123,122,.25);display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
 .topbar-email{color:rgba(255,255,255,.55);font-size:.76rem;margin-top:3px}
 .topbar-user{color:#fff;font-size:.8rem;display:flex;align-items:center;gap:8px;opacity:.9}
 .topbar-user .dot{width:24px;height:24px;border-radius:50%;background:#2F7B7A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
@@ -43,7 +43,9 @@ thead th{background:#101B34;color:#fff;text-align:left;padding:11px 16px;font-si
 tbody td{padding:10px 16px;font-size:.82rem;border-bottom:1px solid #F0F1F3;vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FAFBFC}
-td.dept-cell{background:#F5F6F8;font-weight:700;color:#323130;border-right:3px solid #2F7B7A}
+td.dept-cell{background:#EFF3F6;font-weight:700;color:#323130;border-right:4px solid #2F7B7A;border-left:4px solid #2F7B7A}
+tbody tr.dept-first td{border-top:2px solid #d5d9de}
+tbody tr.dept-first:first-child td{border-top:none}
 td.team-cell{color:#323130;font-weight:500}
 
 .dd{position:relative;z-index:41}
@@ -87,9 +89,12 @@ td.team-cell{color:#323130;font-weight:500}
 <div id="app">
   <div class="topbar-outer">
     <div class="topbar">
-      <div>
-        <div class="topbar-title"><span class="badge-mark"></span>STK Policies & Guidelines</div>
-        <div class="topbar-email">stk_compliance@hyosung.com</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="topbar-icon">📋</div>
+        <div>
+          <div class="topbar-title">STK Policies & Guidelines</div>
+          <div class="topbar-email">stk_compliance@hyosung.com</div>
+        </div>
       </div>
       <div class="topbar-user"><span class="dot" id="user-initial">U</span><span id="user-name">-</span></div>
     </div>
@@ -131,7 +136,7 @@ const SITE_PATH    = 'startruckkorea.sharepoint.com:/sites/STK-NAS:';
 const LIBRARY_NAME = 'STK';   // 라이브러리 서버상대경로 폴더명 (표시이름: STK공유문서). 다르면 여기만 수정.
 const BASE_FOLDER  = 'STK-Shared/6. STK-directed B2B/017._SPG & PDCF STK';
 const SPG_ROOT     = BASE_FOLDER + '/01_SPG';
-const LOG_ROOT      = BASE_FOLDER + '/00_Logging';
+const LOG_LIST_NAME = 'SPG_DownloadLogs';   // 다운로드 로그가 쌓이는 SharePoint 리스트 (STK-NAS 사이트)
 
 // 파일명 규칙: "01-STK_..." 처럼 숫자-STK_ 로 시작해야 목록에 노출됨 (정렬 기준 = 숫자)
 const NAME_RULE = /^(\d+)-STK_/;
@@ -361,52 +366,22 @@ async function downloadFile(e, itemId, fileName, dept, team, sub) {
 
 async function logDownload(dept, team, sub, fileName) {
   const now = new Date();
-  const dateStr = now.toISOString().slice(0,10); // YYYY-MM-DD
-  const timeStr = now.toTimeString().slice(0,8);
-  const who = (user.username || user.name || 'unknown');
-  const logFolderPath = `${LOG_ROOT}/${dateStr}`;
+  const who = user.name || user.username || 'unknown';
+  const whoEmail = user.username || '';
 
-  // 날짜 폴더가 없으면 생성 (폴더 생성은 PATCH가 아니라 상위 폴더에 POST로 폴더 아이템 생성)
-  await ensureFolder(logFolderPath);
-
-  const logFileName = `${dateStr}_${timeStr.replace(/:/g,'')}_${sanitize(who)}.json`;
-  const content = JSON.stringify({
-    date: dateStr, time: timeStr, user: who,
-    department: dept, team: team, category: sub, file: fileName
-  }, null, 2);
-
-  const uploadPath = `${logFolderPath}/${logFileName}`;
-  const t = await token();
-  const res = await fetch(`${GRAPH}/drives/${driveId}/root:/${encPath(uploadPath)}:/content`, {
-    method: 'PUT',
-    headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
-    body: content
-  });
-  if (!res.ok) throw new Error('로그 업로드 실패: ' + res.status);
-}
-
-async function ensureFolder(path) {
-  try {
-    await api(`/drives/${driveId}/root:/${encPath(path)}`);
-    return; // 이미 존재
-  } catch(e) {
-    // 없으면 생성 — 부모 경로부터 순서대로 생성
-  }
-  const parts = path.split('/');
-  let cur = '';
-  for (const part of parts) {
-    const next = cur ? cur + '/' + part : part;
-    try {
-      await api(`/drives/${driveId}/root:/${encPath(next)}`);
-    } catch(e) {
-      const parentUrl = cur ? `/drives/${driveId}/root:/${encPath(cur)}:/children` : `/drives/${driveId}/root/children`;
-      await api(parentUrl, 'POST', { name: part, folder: {}, '@microsoft.graph.conflictBehavior': 'replace' });
+  await api(`/sites/${siteId}/lists/${LOG_LIST_NAME}/items`, 'POST', {
+    fields: {
+      Title: `${fileName} - ${who}`,
+      DownloadedAt: now.toISOString(),
+      UserName: who,
+      UserEmail: whoEmail,
+      Department: dept,
+      Team: team,
+      Category: sub,
+      FileName: fileName
     }
-    cur = next;
-  }
+  });
 }
-
-function sanitize(s) { return String(s).replace(/[^a-zA-Z0-9._-]/g, '_'); }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
