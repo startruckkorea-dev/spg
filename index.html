@@ -9,11 +9,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#F5F6F8;min-height:100vh;color:#252423}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(145deg,#0f2744 0%,#101B34 100%);font-family:'Segoe UI',sans-serif}
-.login-box{background:#fff;border-radius:16px;padding:40px 36px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
-.login-title{font-size:1.05rem;font-weight:700;color:#101B34;margin-bottom:4px}
-.login-co{font-size:.8rem;color:#8A94A6;margin-bottom:6px}
-.login-guide{font-size:.8rem;color:#8A94A6;margin-bottom:20px}
-#btn-login{background:linear-gradient(135deg,#2F7B7A,#1A2B4C);color:#fff;border:none;border-radius:10px;padding:13px 0;font-size:.92rem;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
+.login-box{background:#fff;border-radius:14px;padding:32px 30px;width:300px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
+.login-title{font-size:.95rem;font-weight:700;color:#101B34;margin-bottom:4px}
+.login-co{font-size:.74rem;color:#8A94A6;margin-bottom:5px}
+.login-guide{font-size:.74rem;color:#8A94A6;margin-bottom:16px}
+#btn-login{background:linear-gradient(135deg,#2F7B7A,#1A2B4C);color:#fff;border:none;border-radius:8px;padding:11px 0;font-size:.85rem;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
 #btn-login:disabled{background:#cbd5e0;cursor:not-allowed}
 #login-err{color:#C1352E;font-size:.78rem;margin-top:10px;display:none}
 .page-footer{position:fixed;bottom:0;left:0;right:0;padding:9px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;z-index:100}
@@ -21,26 +21,27 @@ body{font-family:'Segoe UI',sans-serif;background:#F5F6F8;min-height:100vh;color
 .page-footer.on-light{color:#8A94A6;background:#fff;border-top:1px solid #e6e4e2}
 
 #app{display:none}
-.topbar-outer{background:#F5F6F8;padding-top:20px}
-.topbar{background:#101B34;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(16,27,52,.18);max-width:1200px;margin:0 auto;border-radius:10px}
-.topbar-title{color:#fff;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
-.topbar-icon{width:30px;height:30px;border-radius:8px;background:rgba(47,123,122,.25);display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
-.topbar-email{color:rgba(255,255,255,.55);font-size:.76rem;margin-top:3px}
-.topbar-user{color:#fff;font-size:.8rem;display:flex;align-items:center;gap:8px;opacity:.9}
-.topbar-user .dot{width:24px;height:24px;border-radius:50%;background:#2F7B7A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
+.topbar-outer{background:#F5F6F8;padding-top:16px}
+.topbar{background:#101B34;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(16,27,52,.18);max-width:1200px;margin:0 auto;border-radius:9px}
+.topbar-title{color:#fff;font-size:.92rem;font-weight:700;display:flex;align-items:center;gap:10px}
+.topbar-icon{background:#fff;border-radius:5px;padding:5px 9px;display:flex;align-items:center;flex-shrink:0}
+.topbar-icon img{height:13px;display:block}
+.topbar-email{color:rgba(255,255,255,.55);font-size:.7rem;margin-top:2px}
+.topbar-user{color:#fff;font-size:.74rem;display:flex;align-items:center;gap:7px;opacity:.9}
+.topbar-user .dot{width:21px;height:21px;border-radius:50%;background:#2F7B7A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;flex-shrink:0}
 
-.wrap{max-width:1200px;margin:28px auto;padding:0 24px 70px}
-.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px}
-.toolbar-title{font-size:.9rem;font-weight:700;color:#323130}
-.hint{font-size:.76rem;color:#8A94A6}
+.wrap{max-width:1200px;margin:22px auto;padding:0 22px 60px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;flex-wrap:wrap;gap:10px}
+.toolbar-title{font-size:.82rem;font-weight:700;color:#323130}
+.hint{font-size:.7rem;color:#8A94A6}
 
 table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);border:1px solid #e6e4e2}
 thead tr:first-child th:first-child{border-top-left-radius:8px}
 thead tr:first-child th:last-child{border-top-right-radius:8px}
 tbody tr:last-child td:first-child{border-bottom-left-radius:8px}
 tbody tr:last-child td:last-child{border-bottom-right-radius:8px}
-thead th{background:#101B34;color:#fff;text-align:left;padding:11px 16px;font-size:.78rem;font-weight:600;letter-spacing:.02em}
-tbody td{padding:10px 16px;font-size:.82rem;border-bottom:1px solid #F0F1F3;vertical-align:middle}
+thead th{background:#101B34;color:#fff;text-align:left;padding:9px 14px;font-size:.72rem;font-weight:600;letter-spacing:.02em}
+tbody td{padding:8px 14px;font-size:.76rem;border-bottom:1px solid #F0F1F3;vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FAFBFC}
 td.dept-cell{background:#F7F8FA;font-weight:700;color:#323130;border-left:3px solid #2F7B7A}
@@ -50,15 +51,15 @@ td.team-cell{color:#323130;font-weight:500}
 
 .dd{position:relative;z-index:41}
 .dd.dd-open{z-index:60}
-.dd-btn{width:100%;max-width:260px;display:flex;justify-content:space-between;align-items:center;gap:8px;
-  border:1px solid #d9d7d5;background:#fff;border-radius:6px;padding:7px 11px;font-size:.78rem;cursor:pointer;color:#323130;transition:border-color .15s}
+.dd-btn{width:100%;max-width:240px;display:flex;justify-content:space-between;align-items:center;gap:8px;
+  border:1px solid #d9d7d5;background:#fff;border-radius:5px;padding:6px 10px;font-size:.72rem;cursor:pointer;color:#323130;transition:border-color .15s}
 .dd-btn:hover{border-color:#2F7B7A}
-.dd-btn .arrow{color:#8A94A6;font-size:.7rem}
+.dd-btn .arrow{color:#8A94A6;font-size:.65rem}
 #dd-backdrop{position:fixed;inset:0;z-index:40;display:none;background:rgba(16,27,52,.15)}
-.dd-panel{position:absolute;top:calc(100% + 4px);left:0;width:260px;background:#fff;
+.dd-panel{position:absolute;top:calc(100% + 4px);left:0;width:240px;background:#fff;
   border:1px solid #d9d7d5;border-radius:7px;box-shadow:0 8px 20px rgba(0,0,0,.14);z-index:50;display:none;max-height:260px;overflow-y:auto}
 .dd-panel.open{display:block}
-.dd-item{padding:9px 12px;font-size:.78rem;cursor:pointer;border-bottom:1px solid #F0F1F3;display:flex;align-items:center;gap:8px;color:#252423}
+.dd-item{padding:8px 12px;font-size:.72rem;cursor:pointer;border-bottom:1px solid #F0F1F3;display:flex;align-items:center;gap:8px;color:#252423}
 .dd-item:last-child{border-bottom:none}
 .dd-item:hover{background:#EFF6F5}
 .dd-item .fico{color:#2F7B7A;flex-shrink:0}
@@ -73,7 +74,7 @@ td.team-cell{color:#323130;font-weight:500}
 
 <div id="login-screen">
   <div class="login-box">
-    <div style="font-size:2rem;margin-bottom:10px">📋</div>
+    <img src="logo.png" alt="Star Truck Korea" style="height:22px;margin-bottom:14px">
     <div class="login-title">STK Policies & Guidelines</div>
     <div class="login-co">Star Truck Korea · Policies & Procedures</div>
     <div class="login-guide">Hyosung M365 계정으로 로그인하세요</div>
@@ -90,7 +91,7 @@ td.team-cell{color:#323130;font-weight:500}
   <div class="topbar-outer">
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:12px">
-        <div class="topbar-icon">📋</div>
+        <div class="topbar-icon"><img src="logo.png" alt="Star Truck Korea"></div>
         <div>
           <div class="topbar-title">STK Policies & Guidelines</div>
           <div class="topbar-email">stk_compliance@hyosung.com</div>
@@ -100,7 +101,7 @@ td.team-cell{color:#323130;font-weight:500}
     </div>
   </div>
 
-  <div class="wrap" style="margin-top:20px">
+  <div class="wrap" style="margin-top:16px">
     <div class="toolbar">
       <div class="toolbar-title">SPG · Policies & Procedures / Templates</div>
       <div class="hint">▼ 버튼을 클릭하면 등록된 문서 목록이 표시됩니다. 문서 클릭 시 바로 다운로드됩니다.</div>
