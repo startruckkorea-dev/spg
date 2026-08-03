@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>STK Policies & Guidelines</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#F5F6F8;min-height:100vh;color:#252423}
@@ -96,7 +97,7 @@ td.team-cell{color:#323130;font-weight:500}
         <div class="topbar-icon"><img src="logo.png" alt="Star Truck Korea"></div>
         <div>
           <div class="topbar-title">STK Policies & Guidelines</div>
-          <div class="topbar-email">stk_compliance@hyosung.com</div>
+          <div class="topbar-email" id="topbar-email">문의 Email: 불러오는 중...</div>
         </div>
       </div>
       <div class="topbar-user"><span class="dot" id="user-initial">U</span><span id="user-name">-</span></div>
@@ -223,6 +224,11 @@ async function boot(account) {
     siteId = site.id;
     driveId = await resolveDriveId();
     renderTable();
+    loadSystemConfig().then(cfg => {
+      const contact = cfgVal(cfg, 'SPG_CONTACT_1', { email: '-' });
+      const el = document.getElementById('topbar-email');
+      if (el) el.textContent = 'BU Admin 문의 Email: ' + (contact.email || '-');
+    });
   } catch(e) {
     document.getElementById('tbl-body').innerHTML =
       `<tr><td colspan="4" style="color:#a4262c;padding:20px">사이트/라이브러리 연결 오류: ${e.message}<br><span style="font-size:.75rem;color:#605e5c">LIBRARY_NAME 설정값을 확인해주세요.</span></td></tr>`;
@@ -371,6 +377,40 @@ async function downloadFile(e, itemId, fileName, dept, team, sub) {
 // ══ 감사 로깅 — 다른 STK 시스템들과 동일하게 STK-DB "Logging_data" 폴더에 시스템/날짜별 JSON 파일로 기록 ══
 // fire-and-forget: 호출부를 블로킹하지 않고, 실패해도 원 기능(다운로드)에 영향 없음
 let dbSiteId = null, logDriveId = null;
+
+// ── System Config (system_config_final.xlsx, STK-DB) — GW와 동일 패턴 ──
+let _sysConfig = null;
+async function loadSystemConfig() {
+  if (_sysConfig) return _sysConfig;
+  try {
+    const t = await token();
+    const driveId2 = await _getLogDriveId(); // STK-DB의 문서 드라이브 재사용
+    if (!driveId2) throw new Error('STK-DB 드라이브를 찾을 수 없음');
+    const res = await fetch(GRAPH + '/drives/' + driveId2 + '/root:/system_config_final.xlsx:/content',
+      { headers: { Authorization: 'Bearer ' + t } });
+    if (!res.ok) throw new Error('system_config_final.xlsx not found');
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    const cfg = {};
+    rows.forEach(row => {
+      const key = (row[0] || '').toString().trim();
+      if (!key || key.startsWith('[') || key === '설정 키 (KEY)' || key.startsWith('이 파일') || key.startsWith('STK Korea')) return;
+      cfg[key] = { name: (row[1] || '').toString().trim(), email: (row[2] || '').toString().trim() };
+    });
+    _sysConfig = cfg;
+    return cfg;
+  } catch(e) {
+    console.warn('[Config] system_config_final.xlsx 로드 실패, 기본값 사용:', e.message);
+    return null;
+  }
+}
+function cfgVal(cfg, key, defaultObj) {
+  if (!cfg || !cfg[key]) return defaultObj;
+  const v = cfg[key];
+  return { ...defaultObj, name: v.name || defaultObj.name, email: v.email || defaultObj.email };
+}
+
 async function _getLogDriveId() {
   if (logDriveId) return logDriveId;
   try {
