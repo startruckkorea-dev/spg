@@ -295,8 +295,18 @@ async function toggleDropdown(key, dept, team, sub) {
 // ══════════════════════════════════════════════════════════
 // 파일 목록 조회 (네이밍 규칙 필터링 + 번호순 정렬)
 // ══════════════════════════════════════════════════════════
+// SharePoint 업로드 과정에서 폴더명이 자동 변환되는 규칙을 그대로 반영
+// (예: "Policies & Procedures" -> "Policies_and_Procedures", "F&C" -> "FnC", "CEO Office" -> "CEO_Office")
+// 화면 표시 이름은 원래 그대로 쓰고, 실제 SharePoint 경로를 만들 때만 이 변환을 적용합니다.
+function pathify(name) {
+  return String(name)
+    .replace(/ & /g, '_and_')   // 양쪽에 공백이 있는 & -> _and_
+    .replace(/&/g, 'n')          // 공백 없이 붙어있는 & -> n
+    .replace(/ /g, '_');         // 나머지 공백 -> _
+}
+
 async function listFiles(dept, team, sub) {
-  const path = `${SPG_ROOT}/${dept}/${team}/${sub}`;
+  const path = `${SPG_ROOT}/${pathify(dept)}/${pathify(team)}/${pathify(sub)}`;
   let items;
   try {
     const res = await api(`/drives/${driveId}/root:/${encPath(path)}:/children?$top=200`);
