@@ -47,6 +47,7 @@ td.dept-cell{background:#F5F6F8;font-weight:700;color:#323130;border-right:3px s
 td.team-cell{color:#323130;font-weight:500}
 
 .dd{position:relative;z-index:41}
+.dd.dd-open{z-index:60}
 .dd-btn{width:100%;max-width:260px;display:flex;justify-content:space-between;align-items:center;gap:8px;
   border:1px solid #d9d7d5;background:#fff;border-radius:6px;padding:7px 11px;font-size:.78rem;cursor:pointer;color:#323130;transition:border-color .15s}
 .dd-btn:hover{border-color:#2F7B7A}
@@ -271,6 +272,7 @@ let openPanelId = null;
 
 function closeAllDropdowns() {
   document.querySelectorAll('.dd-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.dd.dd-open').forEach(d => d.classList.remove('dd-open'));
   document.getElementById('dd-backdrop').style.display = 'none';
   openPanelId = null;
 }
@@ -281,6 +283,7 @@ async function toggleDropdown(key, dept, team, sub) {
   closeAllDropdowns();
   if (isOpen) return; // 이미 열려있던 걸 다시 누른 거면 닫기만 하고 종료
   panel.classList.add('open');
+  document.getElementById('dd-' + key).classList.add('dd-open');
   document.getElementById('dd-backdrop').style.display = 'block';
   openPanelId = key;
   panel.innerHTML = `<div class="dd-loading">불러오는 중...</div>`;
