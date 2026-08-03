@@ -352,7 +352,7 @@ async function listFiles(dept, team, sub) {
     .filter(it => it.file && NAME_RULE.test(it.name))   // 폴더 제외 + 네이밍 규칙 통과한 파일만
     .map(it => {
       const m = it.name.match(NAME_RULE);
-      return { id: it.id, name: it.name, order: parseInt(m[1],10), displayName: it.name };
+      return { id: it.id, name: it.name, order: parseInt(m[1],10), displayName: it.name.replace(NAME_RULE, '') };
     })
     .sort((a,b) => a.order - b.order);
 }
