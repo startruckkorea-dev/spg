@@ -114,13 +114,13 @@ td.team-cell{color:#323130;font-weight:500}
 
   <div class="wrap" style="margin-top:16px">
     <div class="toolbar">
-      <div class="toolbar-title">SPG · Policies & Procedures / Templates</div>
+      <div class="toolbar-title">PDCF · Privacy Data Consent Form</div>
       <div class="hint">▼ 버튼을 클릭하면 등록된 문서 목록이 표시됩니다. 문서 클릭 시 바로 다운로드됩니다.</div>
     </div>
 
     <table>
       <thead>
-        <tr><th style="width:10%">Department</th><th style="width:16%">Team</th><th style="width:37%">Policies & Procedures</th><th style="width:37%">Templates</th></tr>
+        <tr><th style="width:16%">Department</th><th style="width:24%">Team</th><th style="width:60%">문서</th></tr>
       </thead>
       <tbody id="tbl-body"></tbody>
     </table>
@@ -268,8 +268,7 @@ function renderTable() {
       html += `<tr class="${first?'dept-first':''}">`;
       if (first) html += `<td class="dept-cell" rowspan="${d.teams.length}">${esc(d.dept)}</td>`;
       html += `<td class="team-cell">${esc(team)}</td>`;
-      html += `<td>${ddCell(d.dept, team, 'Policies & Procedures')}</td>`;
-      html += `<td>${ddCell(d.dept, team, 'Templates')}</td>`;
+      html += `<td>${ddCell(d.dept, team, '')}</td>`;
       html += `</tr>`;
     });
   });
@@ -280,7 +279,7 @@ function ddCell(dept, team, sub) {
   const key = ddKey(dept, team, sub);
   return `<div class="dd" id="dd-${key}">
     <button class="dd-btn" onclick="toggleDropdown('${key}','${esc(dept)}','${esc(team)}','${esc(sub)}')">
-      <span class="dd-btn-label">${sub}</span><span class="arrow">▼</span>
+      <span class="dd-btn-label">문서 보기</span><span class="arrow">▼</span>
     </button>
     <div class="dd-panel" id="panel-${key}"></div>
   </div>`;
@@ -349,7 +348,9 @@ function pathify(name) {
 }
 
 async function listFiles(dept, team, sub) {
-  const path = `${SPG_ROOT}/${pathify(dept)}/${pathify(team)}/${pathify(sub)}`;
+  const path = sub
+    ? `${SPG_ROOT}/${pathify(dept)}/${pathify(team)}/${pathify(sub)}`
+    : `${SPG_ROOT}/${pathify(dept)}/${pathify(team)}`;
   let items;
   try {
     const res = await api(`/drives/${driveId}/root:/${encPath(path)}:/children?$top=200`);
