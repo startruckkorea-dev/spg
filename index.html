@@ -228,9 +228,15 @@ async function boot(account) {
   document.getElementById('user-initial').textContent = (user.name || user.username || '?').trim()[0].toUpperCase();
 
   try {
-    const site = await api('/sites/' + SITE_PATH);
-    siteId = site.id;
-    driveId = await resolveDriveId();
+    const cached = JSON.parse(sessionStorage.getItem('spg_site_cache_v1') || 'null');
+    if (cached && cached.siteId && cached.driveId) {
+      siteId = cached.siteId; driveId = cached.driveId;
+    } else {
+      const site = await api('/sites/' + SITE_PATH);
+      siteId = site.id;
+      driveId = await resolveDriveId();
+      try { sessionStorage.setItem('spg_site_cache_v1', JSON.stringify({ siteId, driveId })); } catch(e) {}
+    }
     renderTable();
     loadSystemConfig().then(cfg => {
       const contact = cfgVal(cfg, 'SPG_CONTACT_1', { email: '-' });

@@ -229,9 +229,15 @@ async function boot(account) {
   document.getElementById('user-initial').textContent = (user.name || user.username || '?').trim()[0].toUpperCase();
 
   try {
-    const site = await api('/sites/' + SITE_PATH);
-    siteId = site.id;
-    driveId = await resolveDriveId();
+    const cached = JSON.parse(sessionStorage.getItem('pdcf_site_cache_v1') || 'null');
+    if (cached && cached.siteId && cached.driveId) {
+      siteId = cached.siteId; driveId = cached.driveId;
+    } else {
+      const site = await api('/sites/' + SITE_PATH);
+      siteId = site.id;
+      driveId = await resolveDriveId();
+      try { sessionStorage.setItem('pdcf_site_cache_v1', JSON.stringify({ siteId, driveId })); } catch(e) {}
+    }
 
     document.getElementById('tbl-body').innerHTML =
       `<tr><td colspan="3" style="text-align:center;padding:24px;color:#8A94A6">부서별 문서 유무 확인 중...</td></tr>`;
@@ -239,9 +245,7 @@ async function boot(account) {
     // 모든 부서/팀 폴더를 한 번에 스캔해서, 실제 파일이 있는 팀만 남김
     const allTeams = [];
     DEPTS.forEach(d => d.teams.forEach(team => allTeams.push({ dept: d.dept, team })));
-    const scanResults = await Promise.all(
-      allTeams.map(t => listFiles(t.dept, t.team, '').then(files => ({ ...t, hasFiles: files.length > 0 })).catch(() => ({ ...t, hasFiles: false })))
-    );
+    const scanResults = await batchScanTeams(allTeams);
     const filteredDepts = DEPTS.map(d => ({
       dept: d.dept,
       teams: d.teams.filter(team => scanResults.find(r => r.dept === d.dept && r.team === team)?.hasFiles)
@@ -394,6 +398,46 @@ async function listFiles(dept, team, sub) {
       return { id: it.id, name: it.name, order: parseInt(m[1],10), displayName: it.name.replace(NAME_RULE, '') };
     })
     .sort((a,b) => a.order - b.order);
+}
+
+// 여러 부서/팀의 "파일이 있는지 여부"를 Graph $batch로 한 번에 확인 (요청 왕복 최소화, 최대 20개씩 묶음)
+// 결과는 짧게 세션 캐시(3분)해서, 같은 세션 내 재방문 시 다시 스캔하지 않음
+const SCAN_CACHE_KEY = 'pdcf_scan_cache_v1';
+const SCAN_CACHE_TTL_MS = 3 * 60 * 1000;
+
+async function batchScanTeams(allTeams) {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(SCAN_CACHE_KEY) || 'null');
+    if (cached && (Date.now() - cached.ts) < SCAN_CACHE_TTL_MS && cached.results?.length === allTeams.length) {
+      return cached.results;
+    }
+  } catch(e) {}
+
+  const results = [];
+  for (let i = 0; i < allTeams.length; i += 20) {
+    const chunk = allTeams.slice(i, i + 20);
+    const requests = chunk.map((t, idx) => {
+      const path = `${SPG_ROOT}/${pathify(t.dept)}/${pathify(t.team)}`;
+      return { id: String(idx), method: 'GET', url: `/drives/${driveId}/root:/${encPath(path)}:/children?$top=200&$select=name,file` };
+    });
+    try {
+      const res = await api('/$batch', 'POST', { requests });
+      const byId = {};
+      (res.responses || []).forEach(r => { byId[r.id] = r; });
+      chunk.forEach((t, idx) => {
+        const r = byId[String(idx)];
+        const items = (r && r.status === 200 && r.body && r.body.value) || [];
+        const hasFiles = items.some(it => it.file && NAME_RULE.test(it.name));
+        results.push({ ...t, hasFiles });
+      });
+    } catch(e) {
+      // 배치 자체가 실패하면 이 묶음은 전부 "없음"으로 처리 (표에서 숨겨질 뿐, 에러로 막지 않음)
+      chunk.forEach(t => results.push({ ...t, hasFiles: false }));
+    }
+  }
+
+  try { sessionStorage.setItem(SCAN_CACHE_KEY, JSON.stringify({ ts: Date.now(), results })); } catch(e) {}
+  return results;
 }
 
 function encPath(path) {
