@@ -255,7 +255,7 @@ async function boot(account) {
     const shownTeams = filteredDepts.reduce((sum, d) => sum + d.teams.length, 0);
     const notice = document.getElementById('pdcf-notice');
     notice.style.display = 'block';
-    notice.textContent = `전체 ${totalTeams}개 팀 중 문서가 등록된 ${shownTeams}개 팀만 표시하고 있습니다. (문서 없는 팀은 자동으로 숨김)`;
+    notice.textContent = `전체 ${totalTeams}개 팀 중 문서가 등록된 ${shownTeams}개 팀만 표시하고 있습니다. (문서 없는 부서 - 팀은 자동으로 숨김)`;
 
     renderTable(filteredDepts);
 
