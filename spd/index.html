@@ -402,7 +402,7 @@ async function listFiles(dept, team, sub) {
 
 // 여러 부서/팀의 "파일이 있는지 여부"를 Graph $batch로 한 번에 확인 (요청 왕복 최소화, 최대 20개씩 묶음)
 // 결과는 짧게 세션 캐시(3분)해서, 같은 세션 내 재방문 시 다시 스캔하지 않음
-const SCAN_CACHE_KEY = 'pdcf_scan_cache_v1';
+const SCAN_CACHE_KEY = 'pdcf_scan_cache_v2';
 const SCAN_CACHE_TTL_MS = 3 * 60 * 1000;
 
 async function batchScanTeams(allTeams) {
@@ -418,7 +418,7 @@ async function batchScanTeams(allTeams) {
     const chunk = allTeams.slice(i, i + 20);
     const requests = chunk.map((t, idx) => {
       const path = `${SPG_ROOT}/${pathify(t.dept)}/${pathify(t.team)}`;
-      return { id: String(idx), method: 'GET', url: `/drives/${driveId}/root:/${encPath(path)}:/children?$top=200&$select=name,file` };
+      return { id: String(idx), method: 'GET', url: `/drives/${driveId}/root:/${encPath(path)}:/children?$top=200` };
     });
     try {
       const res = await api('/$batch', 'POST', { requests });
