@@ -264,7 +264,7 @@ async function boot(account) {
       // 담당자 키 미확정 - 실제 system_config_final.xlsx 키에 맞춰 조정 필요
       const contact = cfgVal(cfg, 'PDCF_CONTACT_1', { email: '-' });
       const el = document.getElementById('topbar-email');
-      if (el) el.textContent = 'BU Admin 문의 Email: ' + (contact.email || '-');
+      if (el) el.textContent = '문의 Email: ' + (contact.email || '-');
     });
   } catch(e) {
     document.getElementById('tbl-body').innerHTML =
