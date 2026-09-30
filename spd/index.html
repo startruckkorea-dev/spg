@@ -74,6 +74,11 @@ td.team-cell{color:#323130;font-weight:500}
 .dd-empty,.dd-loading,.dd-error{padding:14px 12px;font-size:.76rem;color:#8A94A6;text-align:center}
 .dd-error{color:#C1352E}
 
+.toolbar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-xls{display:none;align-items:center;gap:6px;background:#107c10;color:#fff;border:none;border-radius:5px;padding:5px 11px;font-size:.66rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 1px 3px rgba(16,124,16,.25);transition:background .15s}
+.btn-xls:hover{background:#0c630c}
+.btn-xls:disabled{background:#6aa66a;cursor:progress}
+.btn-xls-tag{background:rgba(255,255,255,.22);border-radius:3px;padding:1px 5px;font-size:.56rem;font-weight:700;letter-spacing:.02em}
 #toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:#101B34;color:#fff;
   padding:10px 20px;border-radius:5px;font-size:.82rem;display:none;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 </style>
@@ -116,7 +121,10 @@ td.team-cell{color:#323130;font-weight:500}
   <div class="wrap" style="margin-top:16px">
     <div class="toolbar">
       <div class="toolbar-title">SPD · Privacy Data Consent Form</div>
-      <div class="hint">▼ 버튼을 클릭하면 등록된 문서 목록이 표시됩니다. 문서 클릭 시 바로 다운로드됩니다.</div>
+      <div class="toolbar-right">
+        <div class="hint">▼ 버튼을 클릭하면 등록된 문서 목록이 표시됩니다. 문서 클릭 시 바로 다운로드됩니다.</div>
+        <button id="btn-xls" class="btn-xls" type="button" onclick="exportDocsExcel()" title="관리자 전용 — 폴더의 모든 문서를 제목 · 저장 위치 · 게시 여부와 함께 Excel 로 내려받습니다"><span aria-hidden="true">📊</span><span class="btn-xls-label">Excel 내보내기</span><span class="btn-xls-tag">관리자</span></button>
+      </div>
     </div>
     <div id="pdcf-notice" style="font-size:.7rem;color:#8A94A6;margin:-4px 0 12px;padding:8px 12px;background:#F0F4F3;border-radius:6px;display:none"></div>
 
@@ -261,10 +269,11 @@ async function boot(account) {
     renderTable(filteredDepts);
 
     loadSystemConfig().then(cfg => {
-      // 담당자 키 미확정 - 실제 system_config_final.xlsx 키에 맞춰 조정 필요
+      // 담당자 = system_config_final.xlsx 의 PDCF_CONTACT_1
       const contact = cfgVal(cfg, 'PDCF_CONTACT_1', { email: '-' });
       const el = document.getElementById('topbar-email');
       if (el) el.textContent = '문의 Email: ' + (contact.email || '-');
+      setupXlsExport(cfg);   // PDCF_Admin_N 등록자에게만 Excel 내보내기
     });
   } catch(e) {
     document.getElementById('tbl-body').innerHTML =
@@ -611,6 +620,432 @@ function logAction(action, detail) {
 
 async function logDownload(dept, team, sub, fileName) {
   logAction('파일 다운로드', { 부서: dept, 팀: team, 구분: sub, 파일명: fileName });
+}
+
+// ══════════════════════════════════════════════════════════
+// 관리자 Excel 내보내기 (2026-09-30)
+//   · system_config_final.xlsx 의 PDCF_Admin_N 키에 등록된 사람에게만 단추가 보인다.
+//   · 02_PDCF 밑 폴더를 모두 훑어, 파일마다 화면 제목 · 파일명 · 저장 위치 · 게시 여부(+사유)를 적는다.
+//     「게시」 = 이 화면 드롭다운에 실제로 보이는 문서. 판정은 화면이 쓰는 경로 규칙 · NAME_RULE 과 똑같이 한다.
+//   · 서식이 있는 Excel 은 ExcelJS 가 필요하다 — 관리자가 누를 때만 불러온다(평소 화면 로딩에는 영향 없음).
+//     ExcelJS 를 못 불러오면 SheetJS(이미 로드됨)로 서식 없이라도 내려받게 한다.
+//   · 성공하면 다른 시스템처럼 STK-DB Logging_data/PDCF/날짜/ 에 「Excel 내보내기」 로그를 남긴다.
+// ══════════════════════════════════════════════════════════
+const XLS_SYS      = 'PDCF';
+const XLS_TITLE    = 'STK SPD · Privacy Data Consent Form (PDCF)';
+const XLS_ADMIN_RE = /^PDCF_ADMIN_\d+$/i;   // 예: PDCF_Admin_1, PDCF_Admin_2
+const XLS_SUBS     = [''];
+const XLS_HAS_SUB  = XLS_SUBS[0] !== '';
+const XLS_LIB_LABEL = 'STK공유문서';
+const EXCELJS_URL  = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+async function xlsScreenPath(dept, team) { return resolvePath(await resolveFolderStructure(), dept, team); }   // listFiles 와 같은 규칙(실제 폴더명 탐색)
+
+let _xlsAdmin = false, _xlsBusy = false;
+function setupXlsExport(cfg) {
+  const me = String((user && (user.username || user.email)) || '').trim().toLowerCase();
+  _xlsAdmin = !!(cfg && me) && Object.entries(cfg).some(([k, v]) =>
+    XLS_ADMIN_RE.test(String(k).trim()) && String((v && v.email) || '').trim().toLowerCase() === me);
+  const b = document.getElementById('btn-xls');
+  if (b) b.style.display = _xlsAdmin ? 'inline-flex' : 'none';
+}
+
+function _xlsBtn(text, busy) {
+  const b = document.getElementById('btn-xls'); if (!b) return;
+  b.disabled = !!busy;
+  b.querySelector('.btn-xls-label').textContent = text;
+}
+
+async function _xlsChildren(path) {
+  const sel = '$select=id,name,size,webUrl,file,folder,createdDateTime,lastModifiedDateTime,createdBy,lastModifiedBy';
+  let url = `${GRAPH}/drives/${driveId}/root:/${encPath(path)}:/children?$top=999&${sel}`;
+  const out = [];
+  while (url) {
+    const r = await api(url, 'GET', null, true);
+    out.push(...(r.value || []));
+    url = r['@odata.nextLink'] || null;
+  }
+  return out;
+}
+
+// ROOT 밑을 층별로 훑는다(한 층의 폴더는 6개씩 동시에). 파일마다 ROOT 기준 상대 폴더(rel)를 붙인다.
+async function _xlsWalk(root, onProgress) {
+  const files = []; let level = [''], seen = 0;
+  while (level.length) {
+    const next = [];
+    for (let i = 0; i < level.length; i += 6) {
+      const chunk = level.slice(i, i + 6);
+      const lists = await Promise.all(chunk.map(rel => _xlsChildren(rel ? root + '/' + rel : root)));
+      chunk.forEach((rel, k) => {
+        lists[k].forEach(it => {
+          if (it.folder) next.push(rel ? rel + '/' + it.name : it.name);
+          else if (it.file) files.push(Object.assign({ rel }, it));
+        });
+      });
+      seen += chunk.length;
+      if (seen > 600) throw new Error('폴더가 600개를 넘습니다 — 경로 설정을 확인해 주세요.');
+      if (onProgress) onProgress(seen, files.length);
+    }
+    level = next;
+  }
+  return files;
+}
+
+function _xlsKst(iso) { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : new Date(d.getTime() + 9 * 3600 * 1000); }
+function _xlsKstText(iso) { const d = _xlsKst(iso); if (!d) return ''; const p = n => String(n).padStart(2, '0'); return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`; }
+function _xlsWho(o) { const u = o && o.user; return u ? (u.displayName || u.email || '') : ''; }
+function _xlsFolderUrl(rootUrl, rel) { return rootUrl ? rootUrl.replace(/\/$/, '') + (rel ? '/' + rel.split('/').map(encodeURIComponent).join('/') : '') : ''; }
+
+const XLS_R_NAME  = '파일명 규칙(번호-STK_) 아님';
+const XLS_R_DEEP  = '하위 폴더 안에 있음';
+const XLS_R_OTHER = '화면에 없는 폴더';
+const XLS_FIX = {
+  [XLS_R_NAME]:  f => `파일명 앞에 번호를 붙이세요 — 예) 01-STK_${f.name}`,
+  [XLS_R_DEEP]:  () => '한 단계 위(부서 / 팀' + (XLS_HAS_SUB ? ' / 구분' : '') + ' 폴더 바로 아래)로 옮기세요',
+  [XLS_R_OTHER]: () => '화면에 있는 부서 · 팀' + (XLS_HAS_SUB ? ' · 구분' : '') + ' 폴더로 옮기세요',
+};
+
+// 파일 목록 → 행. 화면이 여는 경로와 정확히 같은 폴더 + NAME_RULE 통과 = 게시.
+async function _xlsBuildRows(files) {
+  const expected = new Map();   // 소문자 상대경로 → {dept, team, sub, di, ti, si}
+  for (let di = 0; di < DEPTS.length; di++) {
+    const d = DEPTS[di];
+    for (let ti = 0; ti < d.teams.length; ti++) {
+      for (let si = 0; si < XLS_SUBS.length; si++) {
+        const full = await xlsScreenPath(d.dept, d.teams[ti], XLS_SUBS[si]);
+        const rel = full.slice(SPG_ROOT.length).replace(/^\/+/, '');
+        expected.set(rel.toLowerCase(), { dept: d.dept, team: d.teams[ti], sub: XLS_SUBS[si], di, ti, si });
+      }
+    }
+  }
+  const depth = XLS_HAS_SUB ? 3 : 2;
+  const deptIdx = name => DEPTS.findIndex(d => normXls(pathify(d.dept)) === normXls(name));
+  const rows = files.map(f => {
+    const relL = f.rel.toLowerCase();
+    const hit = expected.get(relL);
+    const m = f.name.match(NAME_RULE);
+    const parts = f.rel ? f.rel.split('/') : [];
+    let reason = '';
+    const parent = !hit && parts.length > depth ? expected.get(parts.slice(0, depth).join('/').toLowerCase()) : null;
+    if (!hit) reason = parent ? XLS_R_DEEP : XLS_R_OTHER;
+    else if (!m) reason = XLS_R_NAME;
+    const place = hit || parent || null;   // 화면 기준 위치(하위 폴더 파일은 부모 화면 폴더)
+    const base = _xlsBase(parts, depth, place);
+    const ext = (f.name.match(/\.([^.]+)$/) || [, ''])[1].toUpperCase();
+    return {
+      f, hit, place, published: !reason, reason,
+      dept: base.dept, team: base.team, sub: base.sub,
+      order: m ? parseInt(m[1], 10) : null,
+      title: m ? f.name.replace(NAME_RULE, '') : '',
+      ext, sizeKb: (f.size || 0) / 1024,
+      di: place ? place.di : (deptIdx(base.dept) >= 0 ? deptIdx(base.dept) : 999),
+      ti: place ? place.ti : 999, si: place ? place.si : 999,
+      path: SPG_ROOT.split('/').pop() + (f.rel ? ' / ' + f.rel.split('/').join(' / ') : ''),
+    };
+  });
+  // 표시 순서: 화면 순서(부서 → 팀 → 구분) → 게시 먼저 → 화면 번호 → 파일명
+  rows.sort((a, b) => a.di - b.di || a.ti - b.ti || a.si - b.si || (a.published === b.published ? 0 : a.published ? -1 : 1)
+    || (a.order ?? 1e9) - (b.order ?? 1e9) || a.f.name.localeCompare(b.f.name));
+  // 번호 = 등록 순서(가장 먼저 올린 파일이 1) — APS 공통 Excel 번호 규칙
+  rows.map((r, i) => ({ i, t: r.f.createdDateTime || '' })).sort((a, b) => a.t < b.t ? -1 : a.t > b.t ? 1 : 0)
+    .forEach((o, k) => { rows[o.i].no = k + 1; });
+  return rows;
+}
+function _xlsBase(parts, depth, hit) {
+  if (hit) return { dept: hit.dept, team: hit.team, sub: hit.sub };
+  return { dept: parts[0] || '(최상위)', team: parts[1] || '', sub: XLS_HAS_SUB ? (parts[2] || '') : '' };
+}
+function normXls(s) { return String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, ''); }
+
+// 부서 · 팀별 집계 (화면 순서, 화면에 없는 폴더는 「기타」 한 줄)
+function _xlsSummary(rows) {
+  const out = [];
+  DEPTS.forEach((d, di) => d.teams.forEach((team, ti) => {
+    const mine = rows.filter(r => r.di === di && r.ti === ti && r.place);
+    const cell = XLS_SUBS.map((s, si) => ({
+      pub: mine.filter(r => r.si === si && r.published).length,
+      un: mine.filter(r => r.si === si && !r.published).length,
+    }));
+    out.push({ dept: d.dept, team, cell, total: mine.length, first: ti === 0, span: d.teams.length });
+  }));
+  const other = rows.filter(r => !r.place);
+  return { teams: out, other: other.length };
+}
+
+function _xlsLoadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = EXCELJS_URL;
+    s.onload = () => window.ExcelJS ? res(window.ExcelJS) : rej(new Error('ExcelJS 로드 실패'));
+    s.onerror = () => rej(new Error('ExcelJS 를 불러오지 못했습니다'));
+    document.head.appendChild(s);
+  });
+}
+
+async function exportDocsExcel() {
+  if (!_xlsAdmin) { showToast('관리자만 사용할 수 있습니다.'); return; }
+  if (_xlsBusy) return;
+  _xlsBusy = true;
+  const t0 = Date.now();
+  try {
+    _xlsBtn('폴더 확인 중…', true);
+    const libP = _xlsLoadExcelJS().catch(e => { console.warn('[Excel]', e.message, '— 서식 없이 내보냅니다'); return null; });
+    let rootUrl = '';
+    try { rootUrl = (await api(`/drives/${driveId}/root:/${encPath(SPG_ROOT)}`)).webUrl || ''; } catch (e) { console.warn('[Excel] 폴더 주소 조회 실패:', e.message); }
+    const files = await _xlsWalk(SPG_ROOT, (n, fc) => _xlsBtn(`폴더 확인 중… ${n}개 · 파일 ${fc}건`, true));
+    if (!files.length) { showToast('등록된 파일이 없습니다.'); return; }
+    _xlsBtn('Excel 만드는 중…', true);
+    const rows = await _xlsBuildRows(files);
+    const sum = _xlsSummary(rows);
+    const now = _xlsKst(new Date().toISOString());
+    const p = n => String(n).padStart(2, '0');
+    const ds = `${now.getUTCFullYear()}${p(now.getUTCMonth() + 1)}${p(now.getUTCDate())}_${p(now.getUTCHours())}${p(now.getUTCMinutes())}`;
+    const fileName = `${XLS_SYS}_Export_${ds}.xlsx`;
+    const meta = {
+      when: _xlsKstText(new Date().toISOString()),
+      who: ((user && user.name) || '') + (user && user.username ? ` <${user.username}>` : ''),
+      rootUrl,
+    };
+    const ExcelJS = await libP;
+    if (ExcelJS) await _xlsWriteStyled(ExcelJS, rows, sum, meta, fileName);
+    else _xlsWritePlain(rows, fileName);
+    const pub = rows.filter(r => r.published).length;
+    logAction('Excel 내보내기', {
+      파일명: fileName, 전체: rows.length, 게시: pub, 미게시: rows.length - pub,
+      화면에없는폴더: sum.other, 대상폴더: SPG_ROOT, 서식: ExcelJS ? 'ExcelJS' : 'SheetJS(서식 없음)',
+      소요초: Math.round((Date.now() - t0) / 1000),
+    });
+    showToast(`Excel 내보내기 완료 — 게시 ${pub}건 · 미게시 ${rows.length - pub}건`);
+  } catch (e) {
+    console.error('[Excel]', e);
+    showToast('Excel 내보내기 실패: ' + e.message);
+  } finally {
+    _xlsBusy = false;
+    _xlsBtn('Excel 내보내기', false);
+  }
+}
+
+function _xlsSave(buf, fileName) {
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// ExcelJS 를 못 불러왔을 때 — 같은 내용, 서식 없이
+function _xlsWritePlain(rows, fileName) {
+  const head = ['번호', '게시 상태', 'Department', 'Team'].concat(XLS_HAS_SUB ? ['구분'] : [])
+    .concat(['화면 순번', '게시 제목(화면 표시)', '파일명', '형식', '크기(KB)', '최종 수정', '수정자', '등록일', '등록자', '미게시 사유', '저장 위치', '파일 링크']);
+  const aoa = [head].concat(rows.map(r => [r.no, r.published ? '게시' : '미게시', r.dept, r.team].concat(XLS_HAS_SUB ? [r.sub] : [])
+    .concat([r.order ?? '', r.title, r.f.name, r.ext, Math.round(r.sizeKb * 10) / 10, _xlsKstText(r.f.lastModifiedDateTime), _xlsWho(r.f.lastModifiedBy),
+      _xlsKstText(r.f.createdDateTime), _xlsWho(r.f.createdBy), r.reason, r.path, r.f.webUrl || ''])));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '문서 목록');
+  XLSX.writeFile(wb, fileName);
+}
+
+async function _xlsWriteStyled(ExcelJS, rows, sum, meta, fileName) {
+  const NAVY = 'FF101B34', TEAL = 'FF2F7B7A', INK = 'FF252423', GRAY = 'FF8A94A6', LINE = 'FFE3E6EB', ZEBRA = 'FFF7F8FA';
+  const GREEN = 'FF107C10', GREEN_BG = 'FFE8F3E8', AMBER = 'FFB7791F', AMBER_BG = 'FFFCF3E1', RED = 'FFC1352E';
+  const FONT = 'Malgun Gothic';
+  const fill = c => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: c } });
+  const font = (o = {}) => Object.assign({ name: FONT, size: 10, color: { argb: INK } }, o);
+  const thin = c => ({ style: 'thin', color: { argb: c } });
+  const pub = rows.filter(r => r.published).length, un = rows.length - pub;
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'STK ' + XLS_SYS; wb.created = new Date();
+
+  // ───────── 1. 요약 ─────────
+  const S = wb.addWorksheet('요약', { views: [{ showGridLines: false }], properties: { tabColor: { argb: NAVY } } });
+  const nSub = XLS_SUBS.length;
+  const sumCols = XLS_HAS_SUB ? 2 + nSub * 2 + 1 : 2 + 3 + 1;   // Dept, Team, (게시/미게시)×구분 or 게시/미게시/합계/표시, 합계
+  const lastCol = Math.max(sumCols, 7);
+  S.columns = Array.from({ length: lastCol }, (_, i) => ({ width: i === 0 ? 16 : i === 1 ? 26 : 15 }));
+  const span = (r, text, o = {}) => { S.mergeCells(r, 1, r, lastCol); const c = S.getCell(r, 1); c.value = text; Object.assign(c, o); return c; };
+
+  S.getRow(1).height = 38;
+  span(1, `${XLS_TITLE} — 문서 현황`, { font: font({ size: 16, bold: true, color: { argb: 'FFFFFFFF' } }), fill: fill(NAVY), alignment: { vertical: 'middle', indent: 1 } });
+  S.getRow(2).height = 20;
+  span(2, `내보낸 시각 ${meta.when} (KST)   ·   내보낸 사람 ${meta.who}   ·   관리자 전용`, { font: font({ size: 9, color: { argb: GRAY } }), alignment: { vertical: 'middle', indent: 1 } });
+
+  // KPI 3칸
+  const kpi = [['전체 문서', rows.length, NAVY, '폴더에 있는 모든 파일'], ['게시 중', pub, GREEN, '화면 드롭다운에 보이는 문서'], ['미게시', un, un ? AMBER : GRAY, un ? '「미게시 확인」 시트에서 조치' : '확인할 문서 없음']];
+  const kw = Math.floor(lastCol / 3);
+  kpi.forEach(([label, n, color, cap], i) => {
+    const c1 = 1 + i * kw, c2 = i === 2 ? lastCol : c1 + kw - 1;
+    [[4, label, font({ size: 9, bold: true, color: { argb: GRAY } }), 18], [5, n, font({ size: 24, bold: true, color: { argb: color } }), 36], [6, cap, font({ size: 9, color: { argb: GRAY } }), 18]].forEach(([r, v, f, h]) => {
+      S.mergeCells(r, c1, r, c2); const c = S.getCell(r, c1); c.value = v; c.font = f; S.getRow(r).height = h;
+      c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+      for (let k = c1; k <= c2; k++) { const cc = S.getCell(r, k); cc.fill = fill('FFF4F6F9'); const bd = {}; if (r === 4) bd.top = { style: 'medium', color: { argb: color } }; if (k === c2 && i < 2) bd.right = { style: 'thick', color: { argb: 'FFFFFFFF' } }; cc.border = bd; }
+    });
+  });
+
+  let r = 8;
+  const section = (title) => {
+    S.getRow(r).height = 22;
+    span(r, title, { font: font({ size: 11.5, bold: true, color: { argb: NAVY } }), alignment: { vertical: 'bottom' } });
+    for (let k = 1; k <= lastCol; k++) S.getCell(r, k).border = { bottom: { style: 'medium', color: { argb: TEAL } } };
+    r++;
+  };
+  const kv = (k, v, o = {}) => {
+    S.getCell(r, 1).value = k; S.getCell(r, 1).font = font({ bold: true, color: { argb: GRAY } }); S.getCell(r, 1).alignment = { vertical: 'middle' };
+    S.mergeCells(r, 2, r, lastCol); const c = S.getCell(r, 2); c.value = v; c.font = font(o.font || {}); c.alignment = { vertical: 'middle', wrapText: true };
+    S.getRow(r).height = o.h || 19;
+    for (let k2 = 1; k2 <= lastCol; k2++) S.getCell(r, k2).border = { bottom: thin(LINE) };
+    r++;
+  };
+
+  section('저장 위치');
+  kv('사이트', 'STK-NAS  (startruckkorea.sharepoint.com/sites/STK-NAS)');
+  kv('문서 라이브러리', `${XLS_LIB_LABEL}  (${LIBRARY_NAME})`);
+  kv('폴더', SPG_ROOT, { h: 30 });
+  kv('바로 열기', meta.rootUrl ? { text: 'SharePoint 에서 폴더 열기  ↗', hyperlink: meta.rootUrl } : '(주소를 가져오지 못함)', { font: meta.rootUrl ? { color: { argb: 'FF0563C1' }, underline: true } : { color: { argb: GRAY } } });
+  kv('로그', `STK-DB / Logging_data / ${XLS_SYS} / 날짜 폴더 — 다운로드 · Excel 내보내기 기록`, { font: { color: { argb: GRAY } } });
+  r++;
+
+  section('게시 기준 — 두 조건을 모두 만족해야 화면에 보입니다');
+  const ex = XLS_HAS_SUB ? `${pathify(DEPTS[5].dept)} / ${pathify(DEPTS[5].teams[1])} / ${pathify(XLS_SUBS[0])}` : `${pathify(DEPTS[1].dept)} / ${pathify(DEPTS[1].teams[0])}`;
+  kv('① 위치', `부서 / 팀${XLS_HAS_SUB ? ' / 구분(Policies & Procedures · Templates)' : ''} 폴더 바로 아래 — 예) ${ex}`, { h: 30 });
+  const exFile = XLS_HAS_SUB ? 'Travel Policy.pdf' : 'Employee Privacy Consent.pdf';
+  kv('② 파일명', `「번호-STK_」 로 시작 — 예) 01-STK_${exFile}`);
+  kv('화면 표시', '앞 번호 순서로 정렬하고, 「번호-STK_」 를 뗀 나머지를 제목으로 보여 줍니다 — 예) ' + exFile, { h: 30 });
+  if (!XLS_HAS_SUB) kv('팀 표시', '게시 문서가 한 건도 없는 부서 · 팀은 화면에서 자동으로 숨겨집니다.');
+  r++;
+
+  section('부서 · 팀별 현황');
+  const head = ['Department', 'Team'];
+  if (XLS_HAS_SUB) XLS_SUBS.forEach(s => head.push(`${s === 'Policies & Procedures' ? 'P&P' : s} 게시`, `${s === 'Policies & Procedures' ? 'P&P' : s} 미게시`));
+  else head.push('게시', '미게시');
+  head.push('합계');
+  if (!XLS_HAS_SUB) head.push('화면 표시');
+  const hr = S.getRow(r); hr.height = 30;
+  head.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = font({ size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }); c.fill = fill(NAVY); c.alignment = { vertical: 'middle', horizontal: i < 2 ? 'left' : 'center', indent: i < 2 ? 1 : 0, wrapText: true }; });
+  r++;
+  const numFmt = '#,##0;-#,##0;"–"';
+  const tot = new Array(head.length).fill(0);
+  let deptStart = r;
+  sum.teams.forEach((t, idx) => {
+    const row = S.getRow(r); row.height = 19;
+    const vals = [t.dept, t.team];
+    t.cell.forEach(c => vals.push(c.pub, c.un));
+    vals.push(t.total);
+    if (!XLS_HAS_SUB) vals.push(t.cell[0].pub ? '표시' : '숨김');
+    vals.forEach((v, i) => {
+      const c = row.getCell(i + 1); c.value = v;
+      const isUn = i >= 2 && typeof v === 'number' && head[i].endsWith('미게시') && v > 0;
+      const isPub = i >= 2 && typeof v === 'number' && (head[i].endsWith(' 게시') || head[i] === '게시');
+      c.font = font({ bold: i === 0 || i === head.length - 1 && typeof v === 'number', color: { argb: isUn ? AMBER : (i === 0 ? NAVY : (v === '숨김' ? GRAY : INK)) } });
+      if (isUn) c.fill = fill(AMBER_BG);
+      else if (isPub && v > 0) c.font = font({ bold: true, color: { argb: GREEN } });
+      if (typeof v === 'number') { c.numFmt = numFmt; c.alignment = { horizontal: 'center', vertical: 'middle' }; if (i >= 2) tot[i] += v; }
+      else c.alignment = { vertical: 'middle', horizontal: i < 2 ? 'left' : 'center', indent: i < 2 ? 1 : 0 };
+      c.border = (t.first && idx > 0) ? { top: thin('FFC9CED8'), bottom: thin(LINE) } : { bottom: thin(LINE) };
+    });
+    if (t.first && t.span > 1) S.mergeCells(r, 1, r + t.span - 1, 1);
+    r++;
+  });
+  if (sum.other) {
+    const row = S.getRow(r); row.height = 19;
+    S.mergeCells(r, 1, r, head.length - 1);
+    row.getCell(1).value = '기타 — 화면에 없는 폴더의 파일 (모두 미게시)';
+    row.getCell(1).font = font({ bold: true, color: { argb: AMBER } }); row.getCell(1).alignment = { vertical: 'middle', indent: 1 };
+    row.getCell(head.indexOf('합계') + 1).value = sum.other;
+    tot[head.indexOf('합계')] += sum.other;
+    for (let i = 1; i <= head.length; i++) { const c = row.getCell(i); c.fill = fill(AMBER_BG); c.border = { bottom: thin(LINE) }; if (i === head.length) { c.numFmt = numFmt; c.alignment = { horizontal: 'center', vertical: 'middle' }; c.font = font({ bold: true, color: { argb: AMBER } }); } }
+    r++;
+  }
+  const tr = S.getRow(r); tr.height = 21;
+  S.mergeCells(r, 1, r, 2); tr.getCell(1).value = '합계';
+  for (let i = 1; i <= head.length; i++) {
+    const c = tr.getCell(i); c.fill = fill('FFEEF1F5'); c.font = font({ bold: true, color: { argb: NAVY } });
+    c.border = { top: { style: 'medium', color: { argb: NAVY } } };
+    if (i > 2 && head[i - 1] !== '화면 표시') { c.value = tot[i - 1]; c.numFmt = numFmt; c.alignment = { horizontal: 'center', vertical: 'middle' }; }
+    else c.alignment = { vertical: 'middle', indent: 1 };
+  }
+  S.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .4, right: .4, top: .5, bottom: .5, header: .2, footer: .2 } };
+
+  // ───────── 2. 문서 목록 ─────────
+  const cols = [
+    ['번호', 7, 'no'], ['게시 상태', 11, 'st'], ['Department', 14, 'dept'], ['Team', 24, 'team'],
+  ].concat(XLS_HAS_SUB ? [['구분', 21, 'sub']] : []).concat([
+    ['화면 순번', 9, 'order'], ['게시 제목 (화면 표시)', 40, 'title'], ['파일명', 46, 'name'], ['형식', 8, 'ext'], ['크기', 12, 'size'],
+    ['최종 수정', 19, 'mod'], ['수정자', 16, 'modBy'], ['등록일', 19, 'crt'], ['등록자', 16, 'crtBy'],
+    ['미게시 사유', 24, 'reason'], ['저장 폴더 (클릭하면 SharePoint 폴더)', 58, 'path'], ['파일', 9, 'link'],
+  ]);
+  const L = wb.addWorksheet('문서 목록', { views: [{ state: 'frozen', ySplit: 3, xSplit: 0, showGridLines: false }], properties: { tabColor: { argb: TEAL } } });
+  L.columns = cols.map(c => ({ width: c[1] }));
+  L.mergeCells(1, 1, 1, cols.length);
+  Object.assign(L.getCell(1, 1), { value: `${XLS_TITLE} — 문서 목록`, font: font({ size: 13, bold: true, color: { argb: 'FFFFFFFF' } }), fill: fill(NAVY), alignment: { vertical: 'middle', indent: 1 } });
+  L.getRow(1).height = 30;
+  L.mergeCells(2, 1, 2, cols.length);
+  Object.assign(L.getCell(2, 1), { value: `전체 ${rows.length}건 · 게시 ${pub}건 · 미게시 ${un}건   |   번호 = 등록 순서(가장 먼저 올린 파일이 1)   |   저장 폴더 위치: STK공유문서 / ${SPG_ROOT.split('/').slice(0, -1).join(' / ')}   |   ${meta.when} (KST) 기준`, font: font({ size: 9, color: { argb: GRAY } }), alignment: { vertical: 'middle', indent: 1 } });
+  L.getRow(2).height = 20;
+  const h3 = L.getRow(3); h3.height = 24;
+  cols.forEach((c, i) => { const cell = h3.getCell(i + 1); cell.value = c[0]; cell.font = font({ size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }); cell.fill = fill(TEAL); cell.alignment = { vertical: 'middle', horizontal: ['no', 'st', 'order', 'ext', 'link'].includes(c[2]) ? 'center' : 'left', indent: ['no', 'st', 'order', 'ext', 'link'].includes(c[2]) ? 0 : 1, wrapText: true }; });
+  rows.forEach((x, i) => {
+    const row = L.getRow(4 + i); row.height = 19;
+    const folderUrl = _xlsFolderUrl(meta.rootUrl, x.f.rel);
+    const v = {
+      no: x.no, st: x.published ? '● 게시' : '● 미게시', dept: x.dept, team: x.team, sub: x.sub,
+      order: x.order, title: x.published ? x.title : (x.title || ''), name: x.f.name, ext: x.ext, size: x.sizeKb,
+      mod: _xlsKst(x.f.lastModifiedDateTime), modBy: _xlsWho(x.f.lastModifiedBy), crt: _xlsKst(x.f.createdDateTime), crtBy: _xlsWho(x.f.createdBy),
+      reason: x.reason || '', path: folderUrl ? { text: x.path, hyperlink: folderUrl } : x.path,
+      link: x.f.webUrl ? { text: '열기 ↗', hyperlink: x.f.webUrl } : '',
+    };
+    cols.forEach((c, k) => {
+      const cell = row.getCell(k + 1); cell.value = v[c[2]] ?? null;
+      cell.font = font({ size: 9.5 });
+      cell.alignment = { vertical: 'middle', horizontal: ['no', 'st', 'order', 'ext', 'link'].includes(c[2]) ? 'center' : 'left', indent: ['no', 'st', 'order', 'ext', 'link'].includes(c[2]) ? 0 : 1 };
+      cell.border = { bottom: thin(LINE) };
+      if (i % 2) cell.fill = fill(ZEBRA);
+    });
+    const st = row.getCell(cols.findIndex(c => c[2] === 'st') + 1);
+    st.fill = fill(x.published ? GREEN_BG : AMBER_BG); st.font = font({ size: 9.5, bold: true, color: { argb: x.published ? GREEN : AMBER } });
+    const tcell = row.getCell(cols.findIndex(c => c[2] === 'title') + 1);
+    tcell.font = font({ size: 9.5, bold: x.published, color: { argb: x.published ? NAVY : GRAY } });
+    if (!x.published) row.getCell(cols.findIndex(c => c[2] === 'reason') + 1).font = font({ size: 9.5, color: { argb: AMBER } });
+    row.getCell(cols.findIndex(c => c[2] === 'size') + 1).numFmt = '#,##0.0 "KB"';
+    ['mod', 'crt'].forEach(key => { row.getCell(cols.findIndex(c => c[2] === key) + 1).numFmt = 'yyyy-mm-dd hh:mm'; });
+    ['path', 'link'].forEach(key => { const c = row.getCell(cols.findIndex(cc => cc[2] === key) + 1); if (c.value && c.value.hyperlink) c.font = font({ size: 9.5, color: { argb: 'FF0563C1' }, underline: key === 'link' }); });
+    row.getCell(1).font = font({ size: 9.5, color: { argb: GRAY } });
+  });
+  L.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + rows.length, column: cols.length } };
+  L.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '3:3', margins: { left: .3, right: .3, top: .4, bottom: .4, header: .2, footer: .2 } };
+
+  // ───────── 3. 미게시 확인 ─────────
+  const bad = rows.filter(x => !x.published);
+  if (bad.length) {
+    const U = wb.addWorksheet('미게시 확인', { views: [{ state: 'frozen', ySplit: 3, showGridLines: false }], properties: { tabColor: { argb: AMBER } } });
+    const uc = [['번호', 7], ['Department', 14], ['Team', 24]].concat(XLS_HAS_SUB ? [['구분', 21]] : []).concat([['파일명', 42], ['미게시 사유', 24], ['조치 방법', 52], ['저장 폴더 (클릭하면 SharePoint 폴더)', 58], ['파일', 9]]);
+    U.columns = uc.map(c => ({ width: c[1] }));
+    U.mergeCells(1, 1, 1, uc.length);
+    Object.assign(U.getCell(1, 1), { value: `미게시 문서 ${bad.length}건 — 폴더에는 있지만 화면에 보이지 않는 파일`, font: font({ size: 13, bold: true, color: { argb: 'FFFFFFFF' } }), fill: fill(AMBER), alignment: { vertical: 'middle', indent: 1 } });
+    U.getRow(1).height = 30;
+    U.mergeCells(2, 1, 2, uc.length);
+    Object.assign(U.getCell(2, 1), { value: '의도적으로 숨긴 파일(초안 · 이전 버전 등)이면 그대로 두셔도 됩니다. 게시하려면 「조치 방법」 대로 SharePoint 에서 이름이나 위치를 바꾸세요.', font: font({ size: 9, color: { argb: GRAY } }), alignment: { vertical: 'middle', indent: 1 } });
+    U.getRow(2).height = 20;
+    const uh = U.getRow(3); uh.height = 22;
+    uc.forEach((c, i) => { const cell = uh.getCell(i + 1); cell.value = c[0]; cell.font = font({ size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }); cell.fill = fill(NAVY); cell.alignment = { vertical: 'middle', horizontal: i === 0 || c[0] === '파일' ? 'center' : 'left', indent: i === 0 || c[0] === '파일' ? 0 : 1 }; });
+    bad.forEach((x, i) => {
+      const row = U.getRow(4 + i); row.height = 30;
+      const folderUrl = _xlsFolderUrl(meta.rootUrl, x.f.rel);
+      const vals = [x.no, x.dept, x.team].concat(XLS_HAS_SUB ? [x.sub] : []).concat([x.f.name, x.reason, (XLS_FIX[x.reason] || (() => ''))(x.f),
+        folderUrl ? { text: x.path, hyperlink: folderUrl } : x.path, x.f.webUrl ? { text: '열기 ↗', hyperlink: x.f.webUrl } : '']);
+      vals.forEach((v, k) => {
+        const cell = row.getCell(k + 1); cell.value = v;
+        cell.font = font({ size: 9.5, color: { argb: uc[k][0] === '미게시 사유' ? AMBER : (v && v.hyperlink ? 'FF0563C1' : INK) }, bold: uc[k][0] === '파일명', underline: uc[k][0] === '파일' });
+        cell.alignment = { vertical: 'middle', wrapText: ['파일명', '미게시 사유', '조치 방법', '저장 폴더 (클릭하면 SharePoint 폴더)'].includes(uc[k][0]), horizontal: k === 0 || uc[k][0] === '파일' ? 'center' : 'left', indent: k === 0 || uc[k][0] === '파일' ? 0 : 1 };
+        cell.border = { bottom: thin(LINE) };
+        if (i % 2) cell.fill = fill(ZEBRA);
+      });
+    });
+    U.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3 + bad.length, column: uc.length } };
+    U.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '3:3' };
+  }
+
+  _xlsSave(await wb.xlsx.writeBuffer(), fileName);
 }
 
 function showToast(msg) {
