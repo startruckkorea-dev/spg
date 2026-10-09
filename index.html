@@ -91,6 +91,64 @@ html, * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; background-clip: padding-box; }
 </style>
+<style id="aps-mobile">
+/* APS 모바일(10-09 · aps-mobile) — 767px 이하 전용. 웹 화면 무변경 */
+/* SPG(index.html): 결재 시스템이 아니라 자체 상단바(.topbar) 유지. 4열 표(Department · Team · P&P · Templates)는
+   팀별 카드 줄로 쌓는다 — 드롭다운 목록이 표 상자 스크롤에 잘리지 않게. 머리글(thead)은 단추 이름이 같은 뜻이라 숨김. */
+@media (max-width: 767px) {
+  /* ── 상단바 — 제목 한 줄(말줄임), 바로가기 · 사용자는 아래 줄 ── */
+  .topbar-outer { padding: 10px 12px 0; }
+  .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .topbar > div:first-child { flex: 1 1 100%; min-width: 0; gap: 10px !important; }
+  .topbar > div:first-child > div:last-child { min-width: 0; }
+  .topbar-title { display: block; font-size: .86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-email { font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-right { flex: 1 1 100%; flex-wrap: wrap; gap: 6px 8px; min-width: 0; }
+  .topbar-back { font-size: .72rem; min-height: 32px; padding: 6px 10px; white-space: nowrap; }
+  .topbar-user { margin-left: auto; font-size: .74rem; min-width: 0; }
+  .topbar-user #user-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── 본문 여백 · 머리 줄 (아래 고정 바닥글에 가리지 않게 여유) ── */
+  .wrap { margin-left: 12px; margin-right: 12px; padding-bottom: 96px; }
+  .toolbar { gap: 6px 10px; }
+  .toolbar-title { font-size: .84rem; }
+  .toolbar-right { gap: 8px; }
+  .hint { font-size: .72rem; line-height: 1.5; }
+  .btn-xls { min-height: 36px; font-size: .76rem; padding: 6px 12px; }
+
+  /* ── 표 → 팀별 카드 줄. 부서는 띠, 팀 이름 아래 문서 단추. 문서 목록(드롭다운)이 잘리지 않게
+        가로 스크롤 대신 쌓아서 화면 폭에 맞춘다(스크롤 상자는 펼친 목록을 잘라 버림) ── */
+  table { display: block; border-radius: 10px; }
+  thead { display: none; }
+  tbody { display: block; }
+  tbody tr { display: grid; gap: 8px; padding: 10px 12px; position: relative; border-bottom: 1px solid #F0F1F3; align-items: center; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:has(.dd.dd-open) { z-index: 60; }
+  tbody td { display: block; padding: 0; border: none !important; border-radius: 0 !important; font-size: .82rem; background: none; min-width: 0; }
+  tbody tr:hover td { background: none; }
+  tbody td[colspan] { grid-column: 1 / -1; }
+  td.dept-cell { grid-column: 1 / -1; margin: -10px -12px 2px; padding: 8px 12px; background: #F7F8FA; border-left: 3px solid #2F7B7A !important; border-bottom: 1px solid #e6e4e2 !important; font-size: .8rem; }
+  tbody tr:first-child td.dept-cell { border-top-left-radius: 10px !important; border-top-right-radius: 10px !important; }
+  td.team-cell { font-weight: 600; }
+
+  /* 문서 단추 · 펼친 목록 — 목록은 그 줄 폭에 맞춰 펼친다(오른쪽 열에서 화면 밖으로 나가지 않게) */
+  .dd { position: static; }
+  .dd-btn { min-height: 40px; padding: 8px 10px; font-size: .76rem; border-radius: 7px; }
+  .dd-panel { left: 8px; right: 8px; width: auto; max-width: none; }   /* 높이(240px)는 그대로 — JS 의 위/아래 펼침 판단 기준과 같게 */
+  .dd-item { padding: 11px 12px; font-size: .8rem; min-height: 42px; }
+  .dd-empty, .dd-loading, .dd-error { font-size: .8rem; }
+
+  /* ── 바닥글 · 토스트 · 로그인 ── */
+  .page-footer { flex-direction: column; justify-content: center; gap: 2px; padding: 7px 12px; font-size: 10px; text-align: center; line-height: 1.45; }
+  #toast { bottom: 76px; max-width: calc(100vw - 32px); width: max-content; text-align: center; line-height: 1.5; word-break: break-all; }
+  #login-screen { padding: 16px 16px 84px; }
+  .login-box { width: 100%; max-width: 320px; padding: 28px 22px; }
+  #btn-login { min-height: 44px; }
+  /* 4열: 팀 이름 한 줄, 그 아래 P&P · Templates 두 단추 2열 */
+  tbody tr { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  td.team-cell { grid-column: 1 / -1; }
+}
+</style>
 </head>
 <body>
 
