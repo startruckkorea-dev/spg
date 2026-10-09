@@ -95,7 +95,11 @@ html, * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
 /* APS 모바일(10-09 · aps-mobile) — 767px 이하 전용. 웹 화면 무변경 */
 /* SPG(index.html): 결재 시스템이 아니라 자체 상단바(.topbar) 유지. 4열 표(Department · Team · P&P · Templates)는
    팀별 카드 줄로 쌓는다 — 드롭다운 목록이 표 상자 스크롤에 잘리지 않게. 머리글(thead)은 단추 이름이 같은 뜻이라 숨김. */
-@media (max-width: 767px) {
+@media screen and (max-width: 767px) {
+  /* ── 2차(10-10) iPhone · Galaxy 방어 — 글자 자동 확대 끔, 단추가 부모 폭을 넘지 않게(입력 · 날짜 칸은 없음) ── */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  input, select, textarea, button { max-width: 100%; box-sizing: border-box; }
+
   /* ── 상단바 — 제목 한 줄(말줄임), 바로가기 · 사용자는 아래 줄 ── */
   .topbar-outer { padding: 10px 12px 0; }
   .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
@@ -135,7 +139,9 @@ html, * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
   .dd { position: static; }
   .dd-btn { min-height: 40px; padding: 8px 10px; font-size: .76rem; border-radius: 7px; }
   .dd-panel { left: 8px; right: 8px; width: auto; max-width: none; }   /* 높이(240px)는 그대로 — JS 의 위/아래 펼침 판단 기준과 같게 */
-  .dd-item { padding: 11px 12px; font-size: .8rem; min-height: 42px; }
+  .dd-item { padding: 11px 12px; font-size: .8rem; min-height: 42px; align-items: flex-start; }
+  /* 문서 이름 — 폰에서는 마우스를 올려 볼 수 없으니 말줄임 대신 줄바꿈(끝의 버전 · 확장자까지 보이게, 2차) */
+  .dd-item span:not(.fico) { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .dd-empty, .dd-loading, .dd-error { font-size: .8rem; }
 
   /* ── 바닥글 · 토스트 · 로그인 ── */
