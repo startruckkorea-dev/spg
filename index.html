@@ -603,9 +603,11 @@ function logAction(action, detail) {
         timestampKST: `${dateStr} ${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())}`,
         user: rawUser, system: LOG_SYSTEM_NAME, action, detail: detail || {}
       });
-      await fetch(GRAPH + '/drives/' + driveId2 + '/root:' + path + ':/content', {
+      const _lr = await fetch(GRAPH + '/drives/' + driveId2 + '/root:' + path + ':/content', {
         method: 'PUT', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body
       });
+      // 저장이 거부돼도(403 · 429 · 5xx) 흔적이 없던 것 — APS(10-10)처럼 콘솔에 경고만 남긴다(10-15). 원 기능엔 영향 없음
+      if (_lr && !_lr.ok) console.warn('[Log] 기록 실패(무시됨, 원 기능엔 영향 없음): HTTP ' + _lr.status + ' —', LOG_SYSTEM_NAME, action);
     } catch(e) { console.warn('[Log] 기록 실패(무시됨):', e.message); }
   })();
 }
@@ -810,6 +812,7 @@ async function exportDocsExcel() {
     showToast(`Excel 내보내기 완료 — 게시 ${pub}건 · 미게시 ${rows.length - pub}건`);
   } catch (e) {
     console.error('[Excel]', e);
+    try { logAction('Excel 내보내기 실패', { 대상폴더: SPG_ROOT, 오류: String((e && e.message) || e || '').slice(0, 200) }); } catch (le) {}   // 실패도 남긴다(10-15)
     showToast('Excel 내보내기 실패: ' + e.message);
   } finally {
     _xlsBusy = false;
