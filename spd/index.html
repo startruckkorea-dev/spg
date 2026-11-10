@@ -1207,5 +1207,69 @@ function showToast(msg) {
   var tries = 0; iv = setInterval(function () { start(); if (++tries > 240) clearInterval(iv); }, 500);   // 혹시 놓쳤을 때
 })();
 </script>
+<style id="spg-acct-css">
+/* 11-10 머리글 계정 메뉴 — HS-APS 처럼 프로필을 누르면 이름 · 메일 · 로그아웃 */
+.topbar-user.spg-acct{position:relative;cursor:pointer;padding:3px 8px 3px 3px;margin:-3px -4px -3px 0;border:1px solid transparent;border-radius:999px;opacity:1;user-select:none;transition:background .15s,border-color .15s}
+.topbar-user.spg-acct:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22)}
+.topbar-user.spg-acct[aria-expanded="true"]{background:rgba(255,255,255,.14);border-color:rgba(124,196,255,.7);box-shadow:0 0 0 3px rgba(124,196,255,.2)}
+.topbar-user.spg-acct:focus-visible{outline:2px solid #7cc4ff;outline-offset:2px}
+.spg-acct-ch{font-size:9px;opacity:.75;margin-left:1px}
+.spg-acct-menu{position:absolute;right:0;top:calc(100% + 8px);width:280px;max-width:calc(100vw - 24px);background:#fff;border:1px solid #e1dfdd;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;z-index:200;text-align:left;color:#201f1e;cursor:default;font-size:12.5px}
+.spg-acct-menu[hidden]{display:none}
+.spg-acct-menu .mh{display:flex;gap:10px;align-items:center;padding:8px 10px 10px;border-bottom:1px solid #f0efed;margin-bottom:4px;min-width:0}
+.spg-acct-menu .av{flex:none;width:36px;height:36px;border-radius:50%;background:#2F7B7A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:700;background-size:cover;background-position:center}
+.spg-acct-menu .av.has-photo{color:transparent;background-color:#fff;box-shadow:0 0 0 1px #e1dfdd}
+.spg-acct-menu .who{display:flex;flex-direction:column;min-width:0;line-height:1.35}
+.spg-acct-menu .nm{font-weight:600;color:#323130;overflow-wrap:anywhere}
+.spg-acct-menu .ml{font-size:11px;color:#8a8886;overflow-wrap:anywhere}
+.spg-acct-lo{appearance:none;cursor:pointer;width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;border-radius:7px;background:#fff;color:#a4262c;font-size:12.5px;font-weight:600;font-family:inherit;text-align:left}
+.spg-acct-lo:hover,.spg-acct-lo:focus-visible{background:#fdf3f4;outline:none}
+.spg-acct-lo svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+</style>
+<script id="spg-acct-js">
+/* 11-10 머리글 계정 메뉴 — 오른쪽 위 프로필(사진 · 이름)을 누르면 HS-APS 계정 메뉴와 같은 모양으로 이름 · 메일 · 「로그아웃」.
+   · 로그아웃: 이 브라우저에 기억한 내 사진(spg.photo.v1)을 지우고 Microsoft 로그아웃(msalApp.logoutRedirect) — 돌아오면 로그인 화면.
+   · 메뉴 밖을 누르거나 Esc 로 닫힘 · 키보드(Enter · Space · ↓)로 열림. SPG · SPD 같은 조각. */
+(function () {
+  'use strict';
+  var box = document.querySelector('.topbar-user'), dot = document.getElementById('user-initial'), nameEl = document.getElementById('user-name');
+  if (!box || !dot) return;
+  box.classList.add('spg-acct'); box.setAttribute('role', 'button'); box.setAttribute('tabindex', '0'); box.setAttribute('aria-haspopup', 'menu'); box.setAttribute('aria-expanded', 'false'); box.title = '계정';
+  var ch = document.createElement('span'); ch.className = 'spg-acct-ch'; ch.setAttribute('aria-hidden', 'true'); ch.textContent = '▾'; box.appendChild(ch);
+  var menu = document.createElement('div'); menu.className = 'spg-acct-menu'; menu.setAttribute('role', 'menu'); menu.hidden = true;
+  menu.innerHTML = '<div class="mh"><span class="av" aria-hidden="true"></span><span class="who"><span class="nm"></span><span class="ml"></span></span></div>'
+    + '<button type="button" class="spg-acct-lo" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4v18h-4M10 17l5-5-5-5M3 12h12"/></svg>로그아웃</button>';
+  box.appendChild(menu);
+  var av = menu.querySelector('.av'), nm = menu.querySelector('.nm'), ml = menu.querySelector('.ml'), lo = menu.querySelector('.spg-acct-lo');
+  function acct() { return (typeof user !== 'undefined' && user) || null; }
+  function fill() {
+    var a = acct() || {};
+    nm.textContent = a.name || (nameEl && nameEl.textContent) || '';
+    ml.textContent = a.username || '';
+    var photo = dot.classList.contains('has-photo') ? dot.style.backgroundImage : '';
+    av.style.backgroundImage = photo || ''; av.classList.toggle('has-photo', !!photo); av.textContent = (dot.textContent || '').trim();
+  }
+  function place() {   // 프로필 오른쪽 끝에 맞추되 화면 밖으로 나가지 않게(휴대폰에서는 프로필이 왼쪽에 올 수 있다)
+    menu.style.left = ''; menu.style.right = '';
+    var br = box.getBoundingClientRect(), w = menu.offsetWidth, L = Math.min(Math.max(br.right - w, 8), Math.max(8, innerWidth - w - 8));
+    menu.style.right = 'auto'; menu.style.left = Math.round(L - br.left) + 'px';
+  }
+  function open() { fill(); menu.hidden = false; place(); box.setAttribute('aria-expanded', 'true'); setTimeout(function () { document.addEventListener('click', onDoc); document.addEventListener('keydown', onKey, true); }, 0); }
+  function close(focus) { menu.hidden = true; box.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey, true); if (focus) box.focus(); }
+  function onDoc(e) { if (!box.contains(e.target)) close(false); }
+  function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(true); } }
+  box.addEventListener('click', function (e) { if (menu.contains(e.target)) return; menu.hidden ? open() : close(false); });
+  box.addEventListener('keydown', function (e) { if (e.target !== box) return; if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); if (menu.hidden) { open(); lo.focus(); } else close(true); } });
+  lo.addEventListener('click', function () {
+    try { localStorage.removeItem('spg.photo.v1'); } catch (e) {}
+    try { sessionStorage.removeItem('spg_site_cache_v1'); sessionStorage.removeItem('pdcf_site_cache_v1'); } catch (e) {}
+    try {
+      var a = (typeof msalApp !== 'undefined' && msalApp) ? (msalApp.getActiveAccount() || acct()) : null;
+      if (typeof msalApp !== 'undefined' && msalApp) msalApp.logoutRedirect({ account: a || undefined, postLogoutRedirectUri: location.origin + location.pathname });
+    } catch (e) { console.warn('[SPG] 로그아웃 실패:', e && e.message); }
+    close(false);
+  });
+})();
+</script>
 </body>
 </html>
