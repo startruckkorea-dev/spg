@@ -1174,9 +1174,8 @@ function showToast(msg) {
     });
     return out.filter(function (x) { return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x); });
   }
-  async function loadPhoto() {
-    var me = myMails(); if (!me.length) return;
-    var c = lsGet(); if (c && me.indexOf(c.me) >= 0 && RE.test(c.img || '')) setAv(c.img);
+  async function loadPhoto(me, c) {
+    if (!me.length) return;
     try {
       var d = await _getLogDriveId(); if (!d) return;
       var t = await token(); if (!t) return;
@@ -1192,12 +1191,20 @@ function showToast(msg) {
       if (key) { lsSet({ me: key, tag: tag, img: u[key] }); setAv(u[key]); } else { lsSet({ me: me[0], tag: tag, img: '' }); setAv(null); }
     } catch (e) { console.warn('[SPG] 계정 사진을 읽지 못함(이니셜로 표시):', e && e.message); }
   }
-  // 로그인 · 화면이 뜬 뒤 한 번(boot 가 user 를 채운 뒤)
-  var tries = 0, iv = setInterval(function () {
-    var app = document.getElementById('app');
-    if (typeof user !== 'undefined' && user && app && app.style.display === 'block') { clearInterval(iv); loadPhoto(); }
-    else if (++tries > 240) clearInterval(iv);
-  }, 500);
+  // 11-10 밤: 처음에 이니셜이 잠깐 보였다가 사진으로 바뀌던 것(0.5초 간격으로 로그인을 확인했다) — 화면이 이름 · 이니셜을 넣는 그 순간
+  // (같은 작업 안 · 그리기 전)에 기억해 둔 내 사진을 먼저 입히고, 파일이 바뀌었는지는 그 뒤에 확인한다. HS-APS 처럼 첫 그림부터 사진.
+  var c0 = lsGet(); if (c0 && RE.test(c0.img || '')) { try { var pre = new Image(); pre.src = c0.img; if (pre.decode) pre.decode().catch(function () {}); } catch (e) {} }   // 미리 풀어 두기
+  var done = false, mo = null, iv = 0;
+  function start() {
+    if (done || typeof user === 'undefined' || !user) return;
+    done = true; if (mo) mo.disconnect(); clearInterval(iv);
+    var me = myMails(), c = lsGet();
+    if (c && me.indexOf(c.me) >= 0 && RE.test(c.img || '')) setAv(c.img); else if (c && me.indexOf(c.me) < 0) { lsSet(null); c = null; }   // 다른 계정의 기억은 지운다
+    loadPhoto(me, c);
+  }
+  var el = document.getElementById('user-initial');
+  if (el && window.MutationObserver) { mo = new MutationObserver(start); mo.observe(el, { childList: true, characterData: true, subtree: true }); }
+  var tries = 0; iv = setInterval(function () { start(); if (++tries > 240) clearInterval(iv); }, 500);   // 혹시 놓쳤을 때
 })();
 </script>
 </body>
