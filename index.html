@@ -1057,5 +1057,59 @@ function showToast(msg) {
   window._toastTimer = setTimeout(() => t.style.display = 'none', 3000);
 }
 </script>
+<style id="spg-photo-css">
+/* 11-10 머리글 계정 — 이니셜 동그라미 대신 내 사진(HS-APS 처럼). 사진이 없으면 예전 이니셜 그대로 */
+.topbar-user .dot{width:24px;height:24px;font-size:.66rem}
+.topbar-user .dot.has-photo{color:transparent;background-color:#fff;background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:0 0 0 1.5px rgba(255,255,255,.6)}
+</style>
+<script id="spg-photo-js">
+/* 11-10 머리글 내 사진 — HS-APS 결재함과 같은 원본: STK-DB 문서 라이브러리 맨 위 employee_photos.json(HFS 가 Flex 사진 96×96, { v:1, users:{ 메일: data:image/jpeg… } }).
+   · 내 메일 것 하나만 꺼내 이 브라우저에 기억(localStorage spg.photo.v1 = { me, tag, img }) — 파일이 그대로면(cTag) 다시 받지 않는다. SPG · SPD 는 같은 주소라 함께 쓴다.
+   · 다른 사람 사진은 기억하지 않는다. 사진이 없거나 못 읽으면 예전처럼 이니셜(오류 창 없음 · 콘솔 경고만).
+   · STK-DB 드라이브는 감사 기록 · 설정 파일과 같은 _getLogDriveId() 를 쓴다(요청 더 늘지 않음). */
+(function () {
+  'use strict';
+  var LS = 'spg.photo.v1', PHOTO = 'employee_photos.json', RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
+  function setAv(img) {
+    var el = document.getElementById('user-initial'); if (!el) return;
+    if (img) { el.style.backgroundImage = 'url("' + img + '")'; el.classList.add('has-photo'); }
+    else { el.style.backgroundImage = ''; el.classList.remove('has-photo'); }
+  }
+  function lsGet() { try { return JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { return null; } }
+  function lsSet(v) { try { if (v) localStorage.setItem(LS, JSON.stringify(v)); else localStorage.removeItem(LS); } catch (e) {} }
+  function myMails() {
+    var a = (typeof user !== 'undefined' && user) || {}, c = a.idTokenClaims || {}, out = [];
+    [a.username, c.email, c.preferred_username].forEach(function (x) {
+      x = String(x || '').trim().toLowerCase(); if (!x || out.indexOf(x) >= 0) return; out.push(x);
+      var m = x.match(/^(.+)#ext#@/i); if (m) { var i = m[1].lastIndexOf('_'); if (i > 0) { var e = m[1].slice(0, i) + '@' + m[1].slice(i + 1); if (out.indexOf(e) < 0) out.push(e); } }   // 게스트 UPN(이름_회사.com#EXT#@…) → 메일
+    });
+    return out.filter(function (x) { return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x); });
+  }
+  async function loadPhoto() {
+    var me = myMails(); if (!me.length) return;
+    var c = lsGet(); if (c && me.indexOf(c.me) >= 0 && RE.test(c.img || '')) setAv(c.img);
+    try {
+      var d = await _getLogDriveId(); if (!d) return;
+      var t = await token(); if (!t) return;
+      var mr = await fetch(GRAPH + '/drives/' + d + '/root:/' + PHOTO + '?$select=id,cTag,eTag', { headers: { Authorization: 'Bearer ' + t }, cache: 'no-store' });
+      if (mr.status === 404) { lsSet(null); setAv(null); return; }
+      if (!mr.ok) return;
+      var meta = await mr.json(), tag = meta.cTag || meta.eTag || '';
+      if (c && me.indexOf(c.me) >= 0 && c.tag === tag) return;   // 파일이 그대로면 다시 받지 않는다
+      var cr = await fetch(GRAPH + '/drives/' + d + '/items/' + encodeURIComponent(meta.id) + '/content', { headers: { Authorization: 'Bearer ' + t }, cache: 'no-store' });
+      if (!cr.ok) return;
+      var j = await cr.json(), u = j && j.v === 1 && j.users && typeof j.users === 'object' ? j.users : {};
+      var key = me.find(function (k) { return typeof u[k] === 'string' && RE.test(u[k]); });
+      if (key) { lsSet({ me: key, tag: tag, img: u[key] }); setAv(u[key]); } else { lsSet({ me: me[0], tag: tag, img: '' }); setAv(null); }
+    } catch (e) { console.warn('[SPG] 계정 사진을 읽지 못함(이니셜로 표시):', e && e.message); }
+  }
+  // 로그인 · 화면이 뜬 뒤 한 번(boot 가 user 를 채운 뒤)
+  var tries = 0, iv = setInterval(function () {
+    var app = document.getElementById('app');
+    if (typeof user !== 'undefined' && user && app && app.style.display === 'block') { clearInterval(iv); loadPhoto(); }
+    else if (++tries > 240) clearInterval(iv);
+  }, 500);
+})();
+</script>
 </body>
 </html>
